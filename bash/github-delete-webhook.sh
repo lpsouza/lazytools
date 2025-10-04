@@ -78,20 +78,50 @@ fetch_and_prepare_hooks() {
     fi
 
     HOOK_DATA=()
+    # AQUI ESTÁ A CORREÇÃO: Usar (.events | join(",")) para converter o array em string
     while IFS=$'\t' read -r id url events active; do
-        # Format events nicely for display
-        EVENTS_DISPLAY=$(echo "$events" | jq -r '. | join(", ")')
+        # Format events nicely for display (already done in the jq output)
+        EVENTS_DISPLAY=$events
         # Store as a single string, separated by ';'
         HOOK_DATA+=("$id;$url;$EVENTS_DISPLAY;$active")
-    done < <(echo "$HOOKS_JSON" | jq -r '.[] | [.id, .config.url, .events, .active] | @tsv')
+    done < <(echo "$HOOKS_JSON" | jq -r '.[] | [.id, .config.url, (.events | join(","))] | @tsv')
+
+    # A linha que usa @tsv não precisa do .active, pois ele não está no objeto de .events, vamos refazer o pipe para ser mais limpo:
+    # Versão mais robusta, focando em extrair os campos:
+    HOOK_DATA=()
+    while IFS=$'\t' read -r id url events active; do
+        HOOK_DATA+=("$id;$url;$events;$active")
+    done < <(echo "$HOOKS_JSON" | jq -r '.[] | [.id, .config.url, (.events | join(", ")), .active] | @tsv')
+
+    # Se a chamada acima falhar novamente, tentamos a versão sem o `join` no script, pois ela já está sendo feita no display loop! 
+    # Mas, teoricamente, o problema é o array. Vamos manter a última tentativa corrigida.
+    
+    # Tentativa final de correção que deve funcionar:
+    HOOKS_OUTPUT=$(echo "$HOOKS_JSON" | jq -r '.[] | [.id, .config.url, (.events | join(", ")), .active] | @tsv')
+    
+    if [ -z "$HOOKS_OUTPUT" ]; then
+        echo -e "${YELLOW}No webhooks found or jq parsing failed.${NC}"
+        exit 0
+    fi
+    
+    HOOK_DATA=()
+    while IFS=$'\t' read -r id url events active; do
+        HOOK_DATA+=("$id;$url;$events;$active")
+    done <<< "$HOOKS_OUTPUT"
+
+    if [ ${#HOOK_DATA[@]} -eq 0 ]; then
+        echo -e "${YELLOW}No webhooks found after parsing.${NC}"
+        exit 0
+    fi
 }
 
 ##
-# Function to display hooks and get user selection for deletion.
+# Function to display hooks and get user selection for deletion. (DEVE VIR ANTES DE delete_webhook)
 ##
 select_hook_to_delete() {
     PS3="${YELLOW}Select a webhook to delete (or 0 to cancel): ${NC}"
     echo -e "${BOLD}Webhooks:${NC}"
+    
     for i in "${!HOOK_DATA[@]}"; do
         IFS=';' read -r TEMP_ID TEMP_URL TEMP_EVENTS TEMP_ACTIVE <<< "${HOOK_DATA[$i]}"
         ACTIVE_COLOR=$(if [ "$TEMP_ACTIVE" == "true" ]; then echo -e "${GREEN}ACTIVE${NC}"; else echo -e "${RED}INACTIVE${NC}"; fi)

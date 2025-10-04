@@ -14,6 +14,8 @@ if [[ "$1" == "--csv" ]]; then
 fi
 
 OWNER_NAME=$(gh api user --jq .login)
+HEADERS=(Repo Issues Projects Wiki Pages Downloads Discussions Archived Disabled Private Visib Forking Template Releases Packages Deployments)
+
 
 echo -e "${BLUE}${BOLD}Auditing repository features for $OWNER_NAME...${NC}"
 REPOS_JSON=$(gh api "user/repos" --paginate)
@@ -39,10 +41,6 @@ FEATURES=(
     is_template
 )
 
-# Add new features for home page options
-EXTRA_FEATURES=(Releases Packages Deployments)
-HEADERS+=(Releases Packages Deployments)
-
 # Helper to safely get count from gh api, returns 0 on error or 404
 safe_gh_count() {
     local endpoint="$1"
@@ -54,10 +52,9 @@ safe_gh_count() {
     fi
 }
 
-# Helper to check if a repo has releases/packages/deployments
 check_extra_features() {
     local repo="$1"
-    # Check releases
+
     local releases_count=$(safe_gh_count repos/$repo/releases)
     if [ "$releases_count" -gt 0 ]; then
         echo -n "enabled"
@@ -65,7 +62,7 @@ check_extra_features() {
         echo -n "disabled"
     fi
     echo -n ","
-    # Check packages
+
     local packages_count=$(safe_gh_count repos/$repo/packages)
     if [ "$packages_count" -gt 0 ]; then
         echo -n "enabled"
@@ -73,7 +70,7 @@ check_extra_features() {
         echo -n "disabled"
     fi
     echo -n ","
-    # Check deployments
+
     local deployments_count=$(safe_gh_count repos/$repo/deployments)
     if [ "$deployments_count" -gt 0 ]; then
         echo -n "enabled"
@@ -83,7 +80,6 @@ check_extra_features() {
 }
 
 if [ "$CSV_MODE" -eq 1 ]; then
-    # Print CSV header
     (IFS=','; echo "${HEADERS[*]}")
     # Print each repo's features as CSV
     for ((i=0; i<REPOS_COUNT; i++)); do
@@ -105,15 +101,10 @@ if [ "$CSV_MODE" -eq 1 ]; then
     done
     exit 0
 else
-    # Calculate max repo name length for formatting
     MAX_REPO_LEN=$(echo "$REPOS_JSON" | jq -r '.[].full_name' | awk '{ print length }' | sort -nr | head -1)
     ((MAX_REPO_LEN=MAX_REPO_LEN<8?8:MAX_REPO_LEN))
-
-    # Explicit headers and column widths
-    HEADERS=(Repo Issues Projects Wiki Pages Downloads Discussions Archived Disabled Private Visib Forking Template Releases Packages Deployments)
     COL_WIDTHS=($MAX_REPO_LEN 8 10 6 6 10 12 9 9 8 7 8 10 9 9 12)
 
-    # Print top border
     printf "${YELLOW}┌"
     for ((j=0; j<${#HEADERS[@]}; j++)); do
         if [ $j -ne 0 ]; then printf "┬"; fi
@@ -121,7 +112,6 @@ else
     done
     printf "┐${NC}\n"
 
-    # Print table header
     printf "${BOLD}│ %-${COL_WIDTHS[0]}s " "${HEADERS[0]}"
     for ((j=1; j<${#HEADERS[@]}; j++)); do
         printf "│ %-${COL_WIDTHS[$j]}s " "${HEADERS[$j]}"
@@ -129,7 +119,6 @@ else
     printf "│${NC}\n"
 
 
-    # Print header separator
     printf "${YELLOW}├"
     for ((j=0; j<${#HEADERS[@]}; j++)); do
         if [ $j -ne 0 ]; then printf "┼"; fi
@@ -138,8 +127,9 @@ else
     printf "┤${NC}\n"
 
 
-    # Print each repo's features
     for ((i=0; i<REPOS_COUNT; i++)); do
+        IFS=',' read -r rel pkg dep <<< "$(check_extra_features "$REPO_NAME")"
+
         REPO_NAME=$(echo "$REPOS_JSON" | jq -r ".[$i].full_name")
         printf "│ %-${COL_WIDTHS[0]}s " "$REPO_NAME"
         for ((j=1; j<=${#FEATURES[@]}; j++)); do
@@ -153,8 +143,7 @@ else
                 printf "│ %-${COL_WIDTHS[$j]}s " "$VALUE"
             fi
         done
-        # Add extra features
-        IFS=',' read -r rel pkg dep <<< "$(check_extra_features "$REPO_NAME")"
+
         for k in 0 1 2; do
             val=$(echo "$rel,$pkg,$dep" | cut -d, -f$((k+1)))
             idx=$(( ${#FEATURES[@]} + 1 + k ))
@@ -168,7 +157,6 @@ else
     done
 
 
-    # Print bottom border
     printf "${YELLOW}└"
     for ((j=0; j<${#HEADERS[@]}; j++)); do
         if [ $j -ne 0 ]; then printf "┴"; fi
@@ -176,9 +164,7 @@ else
         done
     printf "┘${NC}\n"
 
-    # Add legend
     echo -e "\n${BOLD}Legend:${NC} ${GREEN}✔${NC}=Enabled, ${RED}✘${NC}=Disabled, public/private/visibility=repo type"
 
     echo -e "\n${BLUE}Audit complete.${NC}"
-
 fi

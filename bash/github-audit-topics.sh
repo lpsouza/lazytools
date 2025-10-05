@@ -38,6 +38,7 @@ main_audit_loop() {
     # 1. Fetch ALL repos and their data (pure JSON output).
     # This is the safest way to ensure all pages are fetched into a valid array.
     REPOS_JSON=$(gh api user/repos --paginate 2>/dev/null)
+    REPOS_JSON=$(echo "$REPOS_JSON" | jq --arg OWNER "$GITHUB_OWNER" '[.[] | select(.owner.login == $OWNER)]')
 
     # Check for empty or invalid output
     if [ -z "$REPOS_JSON" ] || ! echo "$REPOS_JSON" | jq -e '.[0].full_name' >/dev/null 2>&1; then

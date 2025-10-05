@@ -213,13 +213,14 @@ print_formatted_table() {
 main_execution() {
     local REPOS_JSON=""
     local REPOS_COUNT=0
+    local OWNER_NAME=$(gh api user --jq .login)
     
     # Fetch all user repos and sort them by name for clean display
     REPOS_JSON=$(gh api "user/repos" --paginate | jq 'sort_by(.full_name)')
+    REPOS_JSON=$(echo "$REPOS_JSON" | jq --arg OWNER "$OWNER_NAME" '[.[] | select(.owner.login == $OWNER)]')
     REPOS_COUNT=$(echo "$REPOS_JSON" | jq 'length')
 
     if [ "$REPOS_COUNT" -eq 0 ]; then
-        local OWNER_NAME=$(gh api user --jq .login)
         echo -e "${RED}No repositories found for $OWNER_NAME.${NC}"
         exit 1
     fi

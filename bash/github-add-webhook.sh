@@ -39,6 +39,8 @@ check_dependencies() {
 fetch_repositories() {
     echo -e "${BLUE}Fetching repositories for $OWNER_NAME...${NC}"
     REPOS=($(gh repo list $OWNER_NAME --limit 100 --json name --jq '.[].name'))
+    IFS=$'\n' REPOS=($(sort <<<"${REPOS[*]}"))
+    unset IFS
     
     if [ ${#REPOS[@]} -eq 0 ]; then
         echo -e "${RED}No repositories found for $OWNER_NAME.${NC}"

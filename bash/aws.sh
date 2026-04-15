@@ -44,6 +44,7 @@ load_env
 docker run --rm $FLAGS \
   -v "${PWD}:/aws" \
   -v "${HOME}:/home/ubuntu" \
+  -e AWS_PROFILE="${AWS_PROFILE:-default}" \
   -w /aws \
   -u ubuntu \
   lpsouza/devops-tools \

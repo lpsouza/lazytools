@@ -17,6 +17,7 @@ Make your CLI life easier with lazytools!
 | `ansible-playbook.sh` | Runs `ansible-playbook` via Docker, mounting current directory and SSH keys. | DevOps | `docker` |
 | `aws.sh` | Runs `aws` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
 | `az.sh` | Runs `az` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
+| `eksctl.sh` | Runs `eksctl` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
 | `gcloud.sh` | Runs `gcloud` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
 | `infracost.sh` | Runs `infracost` via Docker to estimate cloud costs. Requires `.env` config. | DevOps | `docker` |
 | `terraform.sh` | Runs `terraform` commands using a specialized DevOps Docker image. | DevOps | `docker` |

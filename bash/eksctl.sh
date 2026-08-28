@@ -44,7 +44,15 @@ load_env
 docker run --rm $FLAGS \
   -v "${PWD}:/eksctl" \
   -v "${HOME}:/home/ubuntu" \
+  -e HOME="/home/ubuntu" \
   -e AWS_PROFILE="${AWS_PROFILE:-default}" \
+  -e AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}" \
+  -e AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-}}" \
+  -e AWS_SDK_LOAD_CONFIG="1" \
+  -e AWS_SSO_SESSION="${AWS_SSO_SESSION:-}" \
+  -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}" \
+  -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}" \
+  -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN:-}" \
   -w /eksctl \
   -u ubuntu \
   lpsouza/devops-tools \

@@ -12,16 +12,25 @@ Make your CLI life easier with lazytools!
 
 | Scope | Subcommand | Description |
 | :--- | :--- | :--- |
+| **AI Commit** | `gitctl commit` (alias: `ci`, `ai-commit`) | Generate AI commit message from staged changes and commit interactively. |
 | **Local** | `gitctl status` | Quick audit of all Git repositories in workspace (`~/projects`). |
 | **Local** | `gitctl local status [-f]` | Audit local repositories with optional parallel remote fetch (`-f`). |
 | **Local** | `gitctl local dirty` | Filter and show only repositories with uncommitted/untracked changes. |
 | **Local** | `gitctl local unpushed` | Filter and show repositories with unpushed commits (ahead of upstream). |
+| **Local** | `gitctl local commit` | Local workspace AI commit generator (alias of `gitctl commit`). |
 | **GitHub** | `gitctl github features audit` | Audit features (Issues, Wiki, Projects, Pages, etc.) across all repos. |
 | **GitHub** | `gitctl github features config` | Interactively or declaratively configure repository features. |
 | **GitHub** | `gitctl github topics audit` | Audit topics assigned across all GitHub repositories. |
 | **GitHub** | `gitctl github webhooks audit` | Scan webhooks, check delivery failure statuses, and cleanup broken hooks. |
 | **GitHub** | `gitctl github webhooks add` | Add a new webhook to a repository. |
 | **GitHub** | `gitctl github webhooks delete` | Delete a webhook interactively or by ID. |
+
+### Standalone CLI Launchers & Git Aliases
+
+| Command | Description | Prerequisites |
+| :--- | :--- | :--- |
+| `gcommit` | Quick interactive AI commit generator shortcut for `gitctl commit`. | `agy` or `gh copilot` |
+| `git-ai` | Git custom subcommand launcher allowing `git ai` or `git-ai`. | `agy` or `gh copilot` |
 
 ### Standalone DevOps & Automation Scripts
 

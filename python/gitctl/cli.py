@@ -9,6 +9,7 @@ import sys
 from typing import List, Optional
 
 from gitctl import __version__
+from gitctl.commands.commit_cmd import handle_commit_command
 from gitctl.commands.gh_features_cmd import handle_features_command
 from gitctl.commands.gh_topics_cmd import handle_topics_command
 from gitctl.commands.gh_webhooks_cmd import handle_webhooks_command
@@ -22,10 +23,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="Unified Git & GitHub CLI Management Tool.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Scopes:
+  gitctl commit               Generate AI commit message and commit interactively
   gitctl local                Operations on local repositories (~/projects)
   gitctl github (or remote)   Operations on remote GitHub repositories via API
 
 Quick Examples:
+  gitctl commit               Interactive AI commit from staged changes
+  gitctl commit -y            Auto-accept AI commit message
+  gitctl commit --hint "..."  Provide custom hint/guidance to AI
   gitctl status               Quick audit of local workspace repositories
   gitctl local status -f      Fetch all remotes in parallel and audit local repos
   gitctl local dirty          Show only local repositories with uncommitted changes
@@ -43,6 +48,14 @@ Quick Examples:
     )
 
     subparsers = parser.add_subparsers(dest="subcommand", title="Commands", metavar="<command>")
+
+    # --- Top-level: `commit` (aliases: `ci`, `ai-commit`) ---
+    commit_parser = subparsers.add_parser(
+        "commit",
+        aliases=["ci", "ai-commit"],
+        help="Analyze staged changes and commit interactively using AI",
+    )
+    _add_commit_args(commit_parser)
 
     # --- Shortcut: `status` at root ---
     status_parser = subparsers.add_parser(
@@ -70,6 +83,14 @@ Quick Examples:
     # local unpushed
     l_unpushed = local_sub.add_parser("unpushed", help="Show only repos with unpushed commits (ahead of upstream)")
     _add_local_args(l_unpushed)
+
+    # local commit
+    l_commit = local_sub.add_parser(
+        "commit",
+        aliases=["ci", "ai-commit"],
+        help="Analyze staged changes and commit interactively using AI",
+    )
+    _add_commit_args(l_commit)
 
     # Set default for local without action
     _add_local_args(local_parser)
@@ -171,6 +192,20 @@ def _add_local_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
 
 
+def _add_commit_args(p: argparse.ArgumentParser) -> None:
+    """Add standard arguments for AI commit operations."""
+    p.add_argument("-y", "--yes", action="store_true", help="Auto-accept AI commit message without interactive prompt")
+    p.add_argument("-e", "--edit", action="store_true", help="Edit message before committing")
+    p.add_argument("-p", "--provider", choices=["auto", "agy", "copilot"], default="auto", help="AI provider (default: auto)")
+    p.add_argument("--hint", help="Custom guidance or context for AI commit generator")
+    p.add_argument("--dry-run", action="store_true", help="Generate and display commit message without executing git commit")
+    p.add_argument("-a", "--all", action="store_true", help="Stage all modified/deleted tracked files before committing")
+    p.add_argument("--amend", action="store_true", help="Amend previous commit")
+    p.add_argument("--no-verify", action="store_true", help="Bypass git pre-commit hooks")
+    p.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
+    p.add_argument("git_args", nargs=argparse.REMAINDER, help="Additional arguments forwarded to git commit")
+
+
 def _add_gh_common_args(p: argparse.ArgumentParser) -> None:
     """Add standard arguments for GitHub operations."""
     p.add_argument("-o", "--owner", help="GitHub owner / organization (default: authenticated user)")
@@ -189,13 +224,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         parser.print_help()
         return 0
 
-    # 2. Explicit top-level shortcut: `gitctl status`
+    # 2. Explicit top-level shortcut: `gitctl commit`
+    if args.subcommand in ("commit", "ci", "ai-commit"):
+        return handle_commit_command(args)
+
+    # 3. Explicit top-level shortcut: `gitctl status`
     if args.subcommand == "status":
         return handle_local_command(args)
 
-    # 3. Local scope: `gitctl local [status|dirty|unpushed]`
+    # 4. Local scope: `gitctl local [status|dirty|unpushed|commit]`
     if args.subcommand in ("local", "ws"):
-        if not getattr(args, "local_action", None):
+        local_action = getattr(args, "local_action", None)
+        if local_action in ("commit", "ci", "ai-commit"):
+            return handle_commit_command(args)
+
+        if not local_action:
             # If user ran `gitctl local` without action, print local help
             # (unless specific flags like -d, -u, -f, --path were passed)
             has_flags = any([
@@ -213,7 +256,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return 0
         return handle_local_command(args)
 
-    # 4. GitHub scope: `gitctl github [features|topics|webhooks]`
+    # 5. GitHub scope: `gitctl github [features|topics|webhooks]`
     if args.subcommand in ("github", "remote", "gh"):
         gh_action = getattr(args, "github_action", None)
         if not gh_action:

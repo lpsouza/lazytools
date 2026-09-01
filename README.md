@@ -25,6 +25,30 @@ Make your CLI life easier with lazytools!
 | **GitHub** | `gitctl github webhooks add` | Add a new webhook to a repository. |
 | **GitHub** | `gitctl github webhooks delete` | Delete a webhook interactively or by ID. |
 
+### Terminal Monitor: `nodetop`
+
+`nodetop` is a `btop`-inspired interactive terminal monitoring dashboard powered directly by Prometheus `node_exporter` endpoints (e.g. `http://ukitake:9100`).
+
+```bash
+# Launch interactive dashboard (defaults to http://localhost:9100 or NODETOP_URL)
+nodetop
+
+# Connect to a specific remote node_exporter
+nodetop ukitake
+nodetop http://ukitake:9100 -i 0.5
+
+# Print a single metrics snapshot and exit
+nodetop ukitake --once
+```
+
+**Interactive Hotkeys:**
+
+* `q` / `Ctrl+C`: Quit
+* `r`: Force immediate metrics refresh
+* `+` / `-`: Increase / decrease scrape interval (0.5s - 10s)
+* `1` - `5`: Toggle individual panels (CPU, Mem, Disks, Network, System)
+* `h` / `?`: Show help overlay modal
+
 ### Standalone CLI Launchers & Git Aliases
 
 | Command | Description | Prerequisites |

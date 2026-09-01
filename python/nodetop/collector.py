@@ -600,6 +600,41 @@ class NodeExporterCollector:
 
         return results
 
+    @staticmethod
+    def _classify_interface_tier(iface: str) -> int:
+        """
+        Classifies network interface into hierarchy tiers for display prioritization:
+        Tier 0: Physical NICs (eth*, en*, wl*, ww*, ib*, bond*, team*) and VPNs/Tunnels (tailscale*, wg*, tun*, tap*, zt*, etc.)
+        Tier 1: Major host bridges and VM interfaces (br0, lan*, virbr*, macvtap*, docker0, podman*, cni0, vmbr*)
+        Tier 2: Dynamic container bridges (br-[0-9a-fA-F]+) and container veths (veth*, cali*, flannel*, cbr*)
+        Tier 3: Other interfaces
+        Tier 4: Loopback (lo)
+        """
+        if iface == "lo":
+            return 4
+
+        # Dynamic container veths and container runtime bridges
+        if iface.startswith(("veth", "cali", "flannel", "cbr")):
+            return 2
+        if re.match(r"^br-[0-9a-fA-F]{8,}$", iface):
+            return 2
+
+        # Primary physical interfaces
+        if iface.startswith(("eth", "en", "wl", "ww", "ib", "bond", "team")):
+            return 0
+
+        # VPNs, overlays, and secure tunnels
+        if iface.startswith(
+            ("tailscale", "wg", "tun", "tap", "zt", "nordlynx", "wireguard", "ppp", "ipsec", "cilium_wg")
+        ):
+            return 0
+
+        # Infrastructure bridges & VM interfaces
+        if iface.startswith(("br", "lan", "virbr", "macvtap", "vmbr", "docker", "podman", "cni")):
+            return 1
+
+        return 3
+
     def _process_network(
         self, families: Dict[str, MetricFamily], delta_time: Optional[float]
     ) -> List[NetworkInterfaceMetrics]:
@@ -610,6 +645,9 @@ class NodeExporterCollector:
         rx_drops: Dict[str, float] = {}
         tx_drops: Dict[str, float] = {}
         up_map: Dict[str, bool] = {}
+        carrier_map: Dict[str, bool] = {}
+        flags_map: Dict[str, int] = {}
+        info_map: Dict[str, Dict[str, str]] = {}
 
         if "node_network_receive_bytes_total" in families:
             for labels, val in families["node_network_receive_bytes_total"].samples:
@@ -632,6 +670,20 @@ class NodeExporterCollector:
         if "node_network_up" in families:
             for labels, val in families["node_network_up"].samples:
                 up_map[labels.get("device", "")] = bool(val > 0)
+        if "node_network_carrier" in families:
+            for labels, val in families["node_network_carrier"].samples:
+                carrier_map[labels.get("device", "")] = bool(val > 0)
+        if "node_network_flags" in families:
+            for labels, val in families["node_network_flags"].samples:
+                try:
+                    flags_map[labels.get("device", "")] = int(val)
+                except (ValueError, TypeError):
+                    pass
+        if "node_network_info" in families:
+            for labels, _ in families["node_network_info"].samples:
+                dev = labels.get("device", "")
+                if dev:
+                    info_map[dev] = labels
 
         results: List[NetworkInterfaceMetrics] = []
         all_ifaces = sorted(set(rx_map.keys()) | set(tx_map.keys()))
@@ -652,6 +704,25 @@ class NodeExporterCollector:
 
             self.prev_net_io[iface] = {"rx": curr_rx, "tx": curr_tx}
 
+            # State calculation:
+            # Virtual point-to-point/VPN interfaces (e.g. tailscale, wireguard) often have operstate 'unknown'
+            # which node_exporter marks as node_network_up=0. We verify carrier, flags (IFF_UP=0x1),
+            # adminstate, or active throughput.
+            operstate = info_map.get(iface, {}).get("operstate", "")
+            adminstate = info_map.get(iface, {}).get("adminstate", "")
+            has_carrier = carrier_map.get(iface, False)
+            flags = flags_map.get(iface, 0)
+            iff_up = bool(flags & 1) if iface in flags_map else False
+            base_up = up_map.get(iface, False)
+
+            is_up = base_up
+            if not is_up:
+                if rx_rate > 0 or tx_rate > 0:
+                    is_up = True
+                elif operstate != "down":
+                    if has_carrier or iff_up or adminstate == "up":
+                        is_up = True
+
             results.append(
                 NetworkInterfaceMetrics(
                     interface=iface,
@@ -663,16 +734,17 @@ class NodeExporterCollector:
                     tx_errs=tx_errs.get(iface, 0.0),
                     rx_drop=rx_drops.get(iface, 0.0),
                     tx_drop=tx_drops.get(iface, 0.0),
-                    is_up=up_map.get(iface, True),
+                    is_up=is_up,
                 )
             )
 
-        # Order: Active non-loopback with traffic/up first, lo last
-        results.sort(
-            key=lambda x: (
-                1 if x.interface == "lo" else 0,
-                0 if (x.rx_bytes_sec > 0 or x.tx_bytes_sec > 0 or x.is_up) else 1,
-                x.interface,
-            )
-        )
+        # Smart ordering: Tier -> Active Traffic -> UP state -> Total Transfer -> Alphabetical
+        def iface_sort_key(item: NetworkInterfaceMetrics) -> Tuple[int, int, int, float, str]:
+            tier = self._classify_interface_tier(item.interface)
+            has_traffic = 0 if (item.rx_bytes_sec > 0 or item.tx_bytes_sec > 0) else 1
+            is_up_val = 0 if item.is_up else 1
+            total_traffic = -(item.rx_total_bytes + item.tx_total_bytes)
+            return (tier, has_traffic, is_up_val, total_traffic, item.interface)
+
+        results.sort(key=iface_sort_key)
         return results

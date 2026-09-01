@@ -79,6 +79,57 @@ class TestNodetopCollector(unittest.TestCase):
         self.assertEqual(len(snap_t1.cores), 1)
         self.assertAlmostEqual(snap_t1.cores[0].usage_pct, 100.0)
 
+    def test_interface_tier_classification(self):
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("eth0"), 0)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("enp60s0"), 0)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("tailscale0"), 0)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("wg0"), 0)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("docker0"), 1)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("macvtap0"), 1)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("br-469514f6ae65"), 2)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("veth423966c"), 2)
+        self.assertEqual(NodeExporterCollector._classify_interface_tier("lo"), 4)
+
+    def test_network_interface_processing_and_up_state(self):
+        collector = NodeExporterCollector("http://localhost:9100")
+        sample = """
+        node_network_receive_bytes_total{device="enp60s0"} 5000
+        node_network_transmit_bytes_total{device="enp60s0"} 5000
+        node_network_up{device="enp60s0"} 1
+
+        node_network_receive_bytes_total{device="tailscale0"} 8000
+        node_network_transmit_bytes_total{device="tailscale0"} 8000
+        node_network_up{device="tailscale0"} 0
+        node_network_carrier{device="tailscale0"} 1
+        node_network_info{device="tailscale0",operstate="unknown",adminstate="up"} 1
+
+        node_network_receive_bytes_total{device="br-469514f6ae65"} 2000
+        node_network_transmit_bytes_total{device="br-469514f6ae65"} 2000
+        node_network_up{device="br-469514f6ae65"} 1
+
+        node_network_receive_bytes_total{device="veth423966c"} 1000
+        node_network_transmit_bytes_total{device="veth423966c"} 1000
+        node_network_up{device="veth423966c"} 1
+
+        node_network_receive_bytes_total{device="lo"} 500
+        node_network_transmit_bytes_total{device="lo"} 500
+        node_network_up{device="lo"} 0
+        """
+        families = parse_prometheus_text(sample)
+        ifaces = collector._process_network(families, delta_time=1.0)
+
+        # Check tailscale0 is correctly identified as is_up=True
+        tailscale_iface = next(i for i in ifaces if i.interface == "tailscale0")
+        self.assertTrue(tailscale_iface.is_up)
+
+        # Check sorting order: Tier 0 (tailscale0 & enp60s0) at the top, then Tier 1/2, then lo
+        names = [i.interface for i in ifaces]
+        self.assertEqual(names[0], "tailscale0")  # Tier 0, 16000 total bytes
+        self.assertEqual(names[1], "enp60s0")      # Tier 0, 10000 total bytes
+        self.assertEqual(names[2], "br-469514f6ae65")  # Tier 2, 4000 total bytes
+        self.assertEqual(names[3], "veth423966c")      # Tier 2, 2000 total bytes
+        self.assertEqual(names[4], "lo")               # Tier 4
+
 
 class TestNodetopHistoryAndFormatters(unittest.TestCase):
 

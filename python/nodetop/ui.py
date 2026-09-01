@@ -94,8 +94,8 @@ class NodetopApp:
         header = HeaderWidget.render(snapshot, self.target_url, self.interval)
         cpu_panel = CpuWidget.render(snapshot, self.history)
         mem_panel = MemoryWidget.render(snapshot, self.history)
-        disk_panel = DiskWidget.render(snapshot)
-        net_panel = NetworkWidget.render(snapshot, self.history)
+        disk_panel = DiskWidget.render(snapshot, max_mounts=10)
+        net_panel = NetworkWidget.render(snapshot, self.history, max_ifaces=10)
         sys_panel = SystemWidget.render(snapshot)
 
         self.console.print(header)
@@ -268,6 +268,18 @@ class NodetopApp:
         if self.show_sys:
             body_rows.append(Layout(name="system", size=5))
 
+        # Calculate dynamic capacity for filesystems and network interfaces based on terminal height
+        term_height = getattr(self.console.size, "height", 24) or 24
+        if term_height >= 45:
+            max_net_ifaces = min(12, max(6, (term_height - 18) // 3))
+            max_fs_mounts = min(10, max(5, (term_height - 18) // 3))
+        elif term_height >= 32:
+            max_net_ifaces = 7
+            max_fs_mounts = 6
+        else:
+            max_net_ifaces = 5
+            max_fs_mounts = 5
+
         if body_rows:
             layout["body"].split_column(*body_rows)
             if self.show_cpu:
@@ -275,9 +287,9 @@ class NodetopApp:
             if self.show_mem:
                 layout["mem"].update(MemoryWidget.render(snapshot, self.history))
             if self.show_disks:
-                layout["disks"].update(DiskWidget.render(snapshot))
+                layout["disks"].update(DiskWidget.render(snapshot, max_mounts=max_fs_mounts))
             if self.show_net:
-                layout["net"].update(NetworkWidget.render(snapshot, self.history))
+                layout["net"].update(NetworkWidget.render(snapshot, self.history, max_ifaces=max_net_ifaces))
             if self.show_sys:
                 layout["system"].update(SystemWidget.render(snapshot))
         else:

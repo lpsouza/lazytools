@@ -310,7 +310,7 @@ class DiskWidget:
     """Renders mounted filesystems and disk IO throughput."""
 
     @staticmethod
-    def render(snapshot: NodeSnapshot) -> Panel:
+    def render(snapshot: NodeSnapshot, max_mounts: int = 5) -> Panel:
         main_table = Table.grid(expand=True)
         main_table.add_column()
 
@@ -328,7 +328,8 @@ class DiskWidget:
         fs_table.add_column("Used / Total", justify="right")
         fs_table.add_column("Free", justify="right", style="green")
 
-        for fs in snapshot.filesystems[:5]:  # show top 5 mounts
+        display_fs = snapshot.filesystems[:max_mounts]
+        for fs in display_fs:
             bar = make_meter_bar(fs.used_pct, width=10)
             usage_text = Text()
             usage_text.append_text(bar)
@@ -361,11 +362,19 @@ class DiskWidget:
                     io_text.append(f"({d.io_util_pct:.1f}% util) ", style="yellow")
             main_table.add_row(io_text)
 
+        subtitle = (
+            f"[dim]{len(display_fs)} of {len(snapshot.filesystems)} filesystems[/dim]"
+            if len(snapshot.filesystems) > len(display_fs)
+            else None
+        )
+
         return Panel(
             main_table,
             box=ROUNDED,
             title="[bold blue]Disks & Filesystems[/bold blue]",
             title_align="left",
+            subtitle=subtitle,
+            subtitle_align="right",
             border_style="blue",
         )
 
@@ -374,7 +383,7 @@ class NetworkWidget:
     """Renders active network interfaces, bandwidth rates, and total transfers."""
 
     @staticmethod
-    def render(snapshot: NodeSnapshot, history: MetricsHistory) -> Panel:
+    def render(snapshot: NodeSnapshot, history: MetricsHistory, max_ifaces: int = 6) -> Panel:
         main_table = Table.grid(expand=True)
         main_table.add_column()
 
@@ -392,15 +401,12 @@ class NetworkWidget:
         net_table.add_column("Total Tx", justify="right", style="dim")
         net_table.add_column("State", justify="center")
 
-        # Filter active or important interfaces (max 5)
-        display_ifaces = [
-            n for n in snapshot.network
-            if (n.rx_bytes_sec > 0 or n.tx_bytes_sec > 0 or n.is_up or n.interface in ("eth0", "enp60s0", "tailscale0", "wlan0"))
-            and n.interface != "lo"
-        ][:5]
+        # Exclude loopback unless it is the only interface
+        candidate_ifaces = [n for n in snapshot.network if n.interface != "lo"]
+        if not candidate_ifaces:
+            candidate_ifaces = snapshot.network
 
-        if not display_ifaces:
-            display_ifaces = snapshot.network[:3]
+        display_ifaces = candidate_ifaces[:max_ifaces]
 
         for iface in display_ifaces:
             rx_style = "bold green" if iface.rx_bytes_sec > 0 else "dim green"
@@ -447,11 +453,19 @@ class NetworkWidget:
         spark_row.add_row(rx_graph, tx_graph)
         main_table.add_row(spark_row)
 
+        subtitle = (
+            f"[dim]{len(display_ifaces)} of {len(candidate_ifaces)} interfaces[/dim]"
+            if len(candidate_ifaces) > len(display_ifaces)
+            else None
+        )
+
         return Panel(
             main_table,
             box=ROUNDED,
             title="[bold yellow]Network Interfaces[/bold yellow]",
             title_align="left",
+            subtitle=subtitle,
+            subtitle_align="right",
             border_style="yellow",
         )
 

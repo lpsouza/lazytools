@@ -126,6 +126,30 @@ class TestWindowsCompatibility(unittest.TestCase):
                 self.assertFalse(mock_execv.called)
                 self.assertFalse(mock_call.called)
 
+    def test_render_local_plain_alignment(self):
+        """Ensure render_local_plain aligns table columns dynamically without distortion."""
+        import io
+        from gitctl.commands.local_cmd import render_local_plain
+        from gitctl.core.git_local import RepoAuditResult, WorkingTreeStatus, RemoteSyncStatus
+
+        results = [
+            RepoAuditResult(name="agents", path="/tmp/agents", is_git=True, branch="main", working_tree=WorkingTreeStatus(), remote_sync=RemoteSyncStatus(has_remote=True, upstream="origin/main")),
+            RepoAuditResult(name="docker-kubernetes-exercises", path="/tmp/docker-kubernetes-exercises", is_git=True, branch="main", working_tree=WorkingTreeStatus(staged=0, unstaged=2, untracked=2), remote_sync=RemoteSyncStatus(has_remote=True, upstream="origin/main")),
+            RepoAuditResult(name="lazytools", path="/tmp/lazytools", is_git=True, branch="main", working_tree=WorkingTreeStatus(), remote_sync=RemoteSyncStatus(has_remote=True, upstream="origin/main")),
+            RepoAuditResult(name="windows-installer", path="/tmp/windows-installer", is_git=True, branch="main", working_tree=WorkingTreeStatus(staged=0, unstaged=2, untracked=0), remote_sync=RemoteSyncStatus(has_remote=True, upstream="origin/main", ahead=8)),
+        ]
+
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            render_local_plain(results, Path("/home/lpsouza/projects"), False)
+
+        lines = [l for l in buf.getvalue().splitlines() if "|" in l]
+        self.assertGreater(len(lines), 1)
+
+        # All rows must have pipes at identical character indices
+        pipe_positions = [[i for i, ch in enumerate(l) if ch == "|"] for l in lines]
+        self.assertEqual(len(set(tuple(p) for p in pipe_positions)), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

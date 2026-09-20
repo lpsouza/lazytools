@@ -10,7 +10,7 @@ import io
 import json
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from gitctl.core.console import create_panel, create_table, get_console, print_error, status_spinner
 from gitctl.core.git_local import GitScanner, RepoAuditResult
@@ -182,15 +182,11 @@ def render_local_plain(
     show_all: bool = False,
 ) -> None:
     """Render plain text table without rich formatting."""
-    print(f"gitctl Local Workspace Audit: {target_path.resolve()} (Fetched: {fetched})")
-    print("-" * 100)
-    print(f"{'Repository':<24} | {'Branch':<15} | {'Local Status':<28} | {'Remote Sync':<20} | {'Stashes':<7}")
-    print("-" * 100)
-
+    rows: List[Tuple[str, str, str, str, str]] = []
     for r in results:
         if not r.is_git:
             if show_all:
-                print(f"{r.name:<24} | {'-':<15} | {'Not a git repo':<28} | {'-':<20} | {'0':<7}")
+                rows.append((r.name, "-", "Not a git repo", "-", "0"))
             continue
 
         wt = "Clean" if r.working_tree.is_clean else f"Dirty (+{r.working_tree.staged} ~{r.working_tree.unstaged} ?{r.working_tree.untracked})"
@@ -202,8 +198,29 @@ def render_local_plain(
         elif sync == "diverged":
             sync = f"Diverged (+{r.remote_sync.ahead}/-{r.remote_sync.behind})"
 
-        print(f"{r.name:<24} | {r.branch:<15} | {wt:<28} | {sync:<20} | {r.working_tree.stashes:<7}")
-    print("-" * 100)
+        rows.append((r.name, r.branch or "-", wt, sync, str(r.working_tree.stashes)))
+
+    headers = ("Repository", "Branch", "Local Status", "Remote Sync", "Stashes")
+    col_widths = [
+        max(len(h), max((len(row[i]) for row in rows), default=0))
+        for i, h in enumerate(headers)
+    ]
+
+    total_width = sum(col_widths) + 3 * (len(headers) - 1)
+    divider = "-" * max(total_width, 60)
+
+    header_line = " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
+
+    print(f"gitctl Local Workspace Audit: {target_path.resolve()} (Fetched: {fetched})")
+    print(divider)
+    print(header_line)
+    print(divider)
+
+    for row in rows:
+        row_line = " | ".join(row[i].ljust(col_widths[i]) for i in range(len(headers)))
+        print(row_line)
+
+    print(divider)
 
 
 def render_local_json(results: List[RepoAuditResult]) -> str:

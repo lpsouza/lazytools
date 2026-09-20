@@ -10,6 +10,9 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
+from bootstrap import ensure_venv
+ensure_venv()
+
 from nodetop.cli import main
 
 if __name__ == "__main__":

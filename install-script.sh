@@ -56,6 +56,43 @@ list_scripts() {
 }
 
 ##
+# Function to ensure virtual environment exists.
+##
+ensure_venv() {
+    local venv_dir="${PROJECT_ROOT}/.venv"
+    local venv_py="${venv_dir}/bin/python"
+    local req_file="${PROJECT_ROOT}/requirements.txt"
+
+    if [ -x "$venv_py" ]; then
+        return 0
+    fi
+
+    local python_bin=""
+    if command -v python3 >/dev/null 2>&1; then
+        python_bin="python3"
+    elif command -v python >/dev/null 2>&1; then
+        python_bin="python"
+    fi
+
+    if [ -z "$python_bin" ]; then
+        return 0
+    fi
+
+    echo -e "${BLUE}Setting up isolated Python virtual environment (.venv)...${NC}"
+    if "$python_bin" -m venv "$venv_dir" 2>/dev/null; then
+        echo -e "${GREEN}Created virtual environment in ${venv_dir}${NC}"
+        if [ -f "$req_file" ] && [ -x "${venv_dir}/bin/pip" ]; then
+            echo -e "${BLUE}Installing dependencies into .venv from requirements.txt...${NC}"
+            "${venv_dir}/bin/pip" install --quiet -r "$req_file"
+            echo -e "${GREEN}Dependencies installed in .venv!${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Notice: Could not create .venv automatically (e.g. 'python3-venv' not installed).${NC}"
+        echo -e "${YELLOW}Scripts will fall back to system Python until .venv is created.${NC}"
+    fi
+}
+
+##
 # Function to install a specific script.
 ##
 install_script() {
@@ -80,6 +117,11 @@ install_script() {
         exit 1
     fi
 
+    # If installing a python script, ensure venv is initialized
+    if [[ "$source_script" == *.py ]]; then
+        ensure_venv
+    fi
+
     local target_link="${BIN_DIR}/${script_name}"
 
     # Ensure BIN_DIR exists
@@ -94,20 +136,32 @@ install_script() {
     chmod +x "$source_script"
 
     # Handle existing target
-    if [ -L "$target_link" ]; then
-        rm "$target_link"
-    elif [ -f "$target_link" ]; then
-        echo -e "${RED}Error: A file already exists at ${target_link} and is NOT a symbolic link.${NC}"
-        echo -e "Please remove it manually if you wish to proceed."
-        exit 1
+    if [ -L "$target_link" ] || [ -f "$target_link" ]; then
+        rm -f "$target_link"
     fi
 
-    # Create symlink
-    ln -s "$source_script" "$target_link"
+    # For Python scripts: create launcher wrapper using isolated venv if available
+    if [[ "$source_script" == *.py ]]; then
+        cat <<EOF > "$target_link"
+#!/bin/bash
+PROJECT_ROOT="${PROJECT_ROOT}"
+VENV_PYTHON="\${PROJECT_ROOT}/.venv/bin/python"
+if [ -x "\$VENV_PYTHON" ]; then
+    exec "\$VENV_PYTHON" "${source_script}" "\$@"
+else
+    exec python3 "${source_script}" "\$@"
+fi
+EOF
+        chmod +x "$target_link"
+        echo -e "${GREEN}Success! Isolated launcher created:${NC}"
+        echo -e "  ${YELLOW}${target_link}${NC} -> ${source_script} (using .venv)"
+    else
+        # For non-Python scripts: create symlink
+        ln -s "$source_script" "$target_link"
+        echo -e "${GREEN}Success! Link created:${NC}"
+        echo -e "  ${YELLOW}${target_link}${NC} -> ${source_script}"
+    fi
 
-    echo -e "${GREEN}Success! Link created:${NC}"
-    echo -e "  ${YELLOW}${target_link}${NC} -> ${source_script}"
-    
     # Path warning
     if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
         echo -e "\n${YELLOW}Warning: ${BIN_DIR} is not in your PATH.${NC}"

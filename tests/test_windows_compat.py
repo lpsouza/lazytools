@@ -104,6 +104,28 @@ class TestWindowsCompatibility(unittest.TestCase):
                 res = nodetop_cli.main([])
                 self.assertEqual(res, 1)
 
+    def test_requirements_and_gitignore_venv(self):
+        """Ensure requirements.txt and .gitignore include venv patterns."""
+        req_file = PROJECT_ROOT / "requirements.txt"
+        gitignore_file = PROJECT_ROOT / ".gitignore"
+
+        self.assertTrue(req_file.is_file(), "requirements.txt must exist")
+        self.assertIn("rich", req_file.read_text())
+
+        self.assertTrue(gitignore_file.is_file(), ".gitignore must exist")
+        self.assertIn(".venv/", gitignore_file.read_text())
+
+    def test_bootstrap_ensure_venv_behavior(self):
+        """Ensure bootstrap.ensure_venv behaves properly when venv is missing or active."""
+        from bootstrap import ensure_venv
+
+        # 1. When no .venv exists, should return immediately without executing
+        with patch("pathlib.Path.is_dir", return_value=False):
+            with patch("os.execv") as mock_execv, patch("subprocess.call") as mock_call:
+                ensure_venv()
+                self.assertFalse(mock_execv.called)
+                self.assertFalse(mock_call.called)
+
 
 if __name__ == "__main__":
     unittest.main()

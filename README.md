@@ -73,24 +73,70 @@ These containerized wrappers run without needing local tool installations. They 
 
 ## Prerequisites
 
-* **Python 3 & rich**: Required for `gitctl` and `nodetop` CLI tools.
-* **GitHub CLI (`gh`)**: Required for remote GitHub features in `gitctl`.
-* **Docker**: Required for DevOps and Automation containerized wrapper scripts (Docker Desktop on Windows or Rancher/WSL2).
+System-level packages should be provisioned via your configuration management (e.g. Ansible playbooks) or system package managers:
+
+### Linux (Ubuntu / Debian)
+
+* `python3`: Python 3.10+ runtime.
+* `python3-venv`: Virtual environment and `ensurepip` module (required for isolated `.venv` creation).
+* `docker.io` / `docker-ce`: Docker engine for containerized DevOps tools.
+* `git`: Version control.
+* `gh`: GitHub CLI (optional, required for `gitctl github` remote management).
+
+Example Ansible task:
+
+```yaml
+- name: Install lazytools system dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-venv
+      - git
+      - docker.io
+    state: present
+```
+
+### Windows 11
+
+* `python`: Python 3.10+ (installed via `winget install Python.Python.3.12` or Chocolatey/Scoop). On Windows, `venv` and `pip` are bundled by default.
+* `docker`: Docker Desktop, Rancher Desktop, or Docker engine via WSL2.
+* `git`: Git for Windows (`winget install Git.Git`).
+* `gh`: GitHub CLI (`winget install GitHub.cli`, optional).
+
+Example Ansible task (`community.windows` / `chocolatey.chocolatey`):
+
+```yaml
+- name: Install lazytools Windows dependencies
+  chocolatey.chocolatey.win_chocolatey:
+    name:
+      - python3
+      - git
+      - docker-desktop
+    state: present
+```
+
+## Virtual Environment & Isolation
+
+Python CLI tools (`gitctl`, `nodetop`, `gcommit`, `git-ai`) run inside an isolated repository virtual environment (`.venv`) powered by `requirements.txt`:
+
+* **Automatic Isolation**: The installers (`install-script.sh` and `install-script.ps1`) automatically initialize `.venv` and install `requirements.txt` (`rich`).
+* **Direct Execution Bootstrap**: The runtime bootstrap (`python/bootstrap.py`) automatically detects `.venv` and re-executes inside it even when scripts are invoked directly (`python3 python/gitctl.py`), preventing dependency pollution in system Python.
+* **Fallback Mode**: If `.venv` is not present, tools run with system Python and graceful plain-text fallbacks.
 
 ## Installation
 
 ### Linux & macOS (Bash)
 
-Use `install-script.sh` to install any script or CLI tool as a symlink in `~/.local/bin`:
+Use `install-script.sh` to install scripts and isolated CLI wrappers into `~/.local/bin`:
 
 ```bash
 # List available tools and scripts
 ./install-script.sh
 
-# Install the unified gitctl CLI tool
+# Install the unified gitctl CLI tool (creates isolated wrapper using .venv)
 ./install-script.sh gitctl
 
-# Install any individual bash script
+# Install any individual DevOps script
 ./install-script.sh terraform
 ```
 

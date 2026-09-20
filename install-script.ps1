@@ -138,6 +138,41 @@ function Ensure-DirectoryOnPath {
     }
 }
 
+function Ensure-VirtualEnv {
+    $venvDir = Join-Path $ProjectRoot ".venv"
+    $venvPython = Join-Path $venvDir "Scripts\python.exe"
+    $reqFile = Join-Path $ProjectRoot "requirements.txt"
+
+    if (Test-Path $venvPython) {
+        return
+    }
+
+    $pythonCmd = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { $null }
+    if (-not $pythonCmd) {
+        Write-Color "Notice: Python is not found in PATH." "DarkYellow"
+        return
+    }
+
+    Write-Color "Setting up isolated Python virtual environment (.venv)..." "Cyan"
+    try {
+        & $pythonCmd -m venv "$venvDir"
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $venvPython)) {
+            Write-Color "  Virtual environment created at $venvDir" "Green"
+            if (Test-Path $reqFile) {
+                Write-Color "  Installing dependencies into .venv from requirements.txt..." "Cyan"
+                & "$venvDir\Scripts\pip.exe" install --quiet -r "$reqFile"
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Color "  Dependencies installed in .venv!" "Green"
+                }
+            }
+        } else {
+            Write-Color "Notice: Could not automatically create .venv. Scripts will use system Python." "DarkYellow"
+        }
+    } catch {
+        Write-Color "Notice: Could not initialize .venv: $_" "DarkYellow"
+    }
+}
+
 function Install-SingleTool {
     param([string]$Name)
 
@@ -174,6 +209,10 @@ function Install-SingleTool {
         return $false
     }
 
+    if ($sourceType -eq "python") {
+        Ensure-VirtualEnv
+    }
+
     if (-not (Test-Path $BinDir)) {
         Write-Color "Creating installation directory: $BinDir" "Yellow"
         New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
@@ -208,10 +247,11 @@ if (`$null -ne `$LASTEXITCODE) {
 powershell -NoProfile -ExecutionPolicy Bypass -File "$sourcePath" %*
 "@
     } elseif ($sourceType -eq "python") {
+        $venvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
         $ps1Content = @"
 <#
 .SYNOPSIS
-    lazytools generated launcher for $Name
+    lazytools generated launcher for $Name (isolated in .venv)
 #>
 [CmdletBinding()]
 param(
@@ -219,7 +259,8 @@ param(
     [string[]]`$RemainingArgs
 )
 
-`$pythonExe = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { "python" }
+`$venvPy = "$venvPython"
+`$pythonExe = if (Test-Path `$venvPy) { `$venvPy } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { "python" }
 & `$pythonExe "$sourcePath" @RemainingArgs
 if (`$null -ne `$LASTEXITCODE) {
     exit `$LASTEXITCODE
@@ -227,7 +268,11 @@ if (`$null -ne `$LASTEXITCODE) {
 "@
         $cmdContent = @"
 @echo off
-python "$sourcePath" %*
+if exist "$venvPython" (
+    "$venvPython" "$sourcePath" %*
+) else (
+    python "$sourcePath" %*
+)
 "@
     } elseif ($sourceType -eq "bash") {
         $ps1Content = @"

@@ -288,4 +288,14 @@ if ($All) {
 if ($installedCount -gt 0) {
     Write-Color "`nInstallation complete! ($installedCount tools installed)" "Green"
     Ensure-DirectoryOnPath -PathToEnsure $BinDir
+
+    # Check for Python and 'rich' module
+    $pythonCmd = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { $null }
+    if ($pythonCmd) {
+        & $pythonCmd -c "import rich" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Color "`nTip: The 'rich' library is recommended for terminal monitoring (nodetop) and color styling." "Yellow"
+            Write-Color "Run: $pythonCmd -m pip install rich" "Cyan"
+        }
+    }
 }

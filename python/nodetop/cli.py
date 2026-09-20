@@ -7,7 +7,14 @@ import os
 import sys
 
 from nodetop import __version__
-from nodetop.ui import NodetopApp
+
+try:
+    from nodetop.ui import NodetopApp
+except ImportError as e:
+    NodetopApp = None  # type: ignore
+    _IMPORT_ERROR = e
+else:
+    _IMPORT_ERROR = None
 
 
 def parse_args(args=None) -> argparse.Namespace:
@@ -73,6 +80,10 @@ Examples:
 
 
 def main(args=None) -> int:
+    if NodetopApp is None:
+        print("Error: nodetop requires the 'rich' package. Please install it with: pip install rich", file=sys.stderr)
+        return 1
+
     parsed = parse_args(args)
 
     app = NodetopApp(

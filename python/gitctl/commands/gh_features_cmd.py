@@ -12,6 +12,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 
 from gitctl.core.console import (
+    Confirm,
+    Prompt,
     create_panel,
     create_table,
     get_console,
@@ -21,12 +23,6 @@ from gitctl.core.console import (
     status_spinner,
 )
 from gitctl.core.github_api import GitHubAPIError, GitHubClient
-
-try:
-    from rich.prompt import Confirm, Prompt
-    HAS_RICH = True
-except ImportError:
-    HAS_RICH = False
 
 
 FEATURE_KEYS = [

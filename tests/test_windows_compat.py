@@ -72,6 +72,38 @@ class TestWindowsCompatibility(unittest.TestCase):
             app._orig_termios = None
             app._restore_terminal()
 
+    def test_gitctl_console_without_rich(self):
+        """Ensure gitctl console and tables function even when rich is not installed."""
+        import importlib
+        with patch.dict("sys.modules", {"rich": None, "rich.console": None, "rich.table": None}):
+            import gitctl.core.console as console_mod
+            importlib.reload(console_mod)
+            self.assertFalse(console_mod.HAS_RICH)
+            self.assertIsNotNone(console_mod.console)
+
+            # Test print, table, panel
+            with patch("builtins.print"):
+                console_mod.console.print("test message")
+            tbl = console_mod.create_table(title="Test")
+            tbl.add_column("Col A")
+            tbl.add_row("Val 1")
+            self.assertIn("Val 1", str(tbl))
+
+            panel = console_mod.create_panel("panel content", title="Title")
+            self.assertIn("panel content", str(panel))
+
+        # Reload back to normal
+        import gitctl.core.console as console_mod
+        importlib.reload(console_mod)
+
+    def test_nodetop_cli_without_rich(self):
+        """Ensure nodetop cli exits gracefully when rich is missing."""
+        import nodetop.cli as nodetop_cli
+        with patch.object(nodetop_cli, "NodetopApp", None):
+            with patch("sys.stderr.write"):
+                res = nodetop_cli.main([])
+                self.assertEqual(res, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

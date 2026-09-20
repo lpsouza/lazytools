@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Prevent MSYS/Git Bash on Windows from auto-converting volume paths
+export MSYS_NO_PATHCONV=1
+
 # Colors for messaging
 NC="\033[0m"
 RED="\033[0;31m"
@@ -36,14 +39,22 @@ load_env() {
     fi
 }
 
+# Resolve paths safely for POSIX and Git Bash on Windows
+TARGET_PWD="$PWD"
+TARGET_HOME="$HOME"
+if command -v cygpath >/dev/null 2>&1; then
+    TARGET_PWD="$(cygpath -m "$PWD")"
+    TARGET_HOME="$(cygpath -m "$HOME")"
+fi
+
 # Initialize script
 check_dependencies
 load_env
 
 # Execute eksctl
 docker run --rm $FLAGS \
-  -v "${PWD}:/eksctl" \
-  -v "${HOME}:/home/ubuntu" \
+  -v "${TARGET_PWD}:/eksctl" \
+  -v "${TARGET_HOME}:/home/ubuntu" \
   -e HOME="/home/ubuntu" \
   -e AWS_PROFILE="${AWS_PROFILE:-default}" \
   -e AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}" \

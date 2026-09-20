@@ -27,7 +27,7 @@ Make your CLI life easier with lazytools!
 
 ### Terminal Monitor: `nodetop`
 
-`nodetop` is a `btop`-inspired interactive terminal monitoring dashboard powered directly by Prometheus `node_exporter` endpoints (e.g. `http://ukitake:9100`).
+`nodetop` is a `btop`-inspired interactive terminal monitoring dashboard powered directly by Prometheus `node_exporter` endpoints (e.g. `http://ukitake:9100`). Works across Linux, macOS, and Windows PowerShell.
 
 ```bash
 # Launch interactive dashboard (defaults to http://localhost:9100 or NODETOP_URL)
@@ -58,26 +58,30 @@ nodetop ukitake --once
 
 ### Standalone DevOps & Automation Scripts
 
-| Script | Description | Category | Prerequisites |
+These containerized wrappers run without needing local tool installations. They are available in both Bash (`bash/`) and native PowerShell (`powershell/`):
+
+| Script (Bash / PowerShell) | Description | Category | Prerequisites |
 | :--- | :--- | :--- | :--- |
-| `ansible-playbook.sh` | Runs `ansible-playbook` via Docker, mounting current directory and SSH keys. | DevOps | `docker` |
-| `aws.sh` | Runs `aws` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
-| `az.sh` | Runs `az` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
-| `eksctl.sh` | Runs `eksctl` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
-| `gcloud.sh` | Runs `gcloud` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
-| `infracost.sh` | Runs `infracost` via Docker to estimate cloud costs. Requires `.env` config. | DevOps | `docker` |
-| `terraform.sh` | Runs `terraform` commands using a specialized DevOps Docker image. | DevOps | `docker` |
-| `n8n.sh` | Runs `n8n-cli` via Docker to manage workflows. Requires `.env` configuration. | Automation | `docker` |
+| `ansible-playbook.sh` / `.ps1` | Runs `ansible-playbook` via Docker, mounting current directory and SSH keys. | DevOps | `docker` |
+| `aws.sh` / `.ps1` | Runs `aws` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
+| `az.sh` / `.ps1` | Runs `az` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
+| `eksctl.sh` / `.ps1` | Runs `eksctl` CLI via Docker forwarding AWS credentials and config. | DevOps | `docker` |
+| `gcloud.sh` / `.ps1` | Runs `gcloud` CLI via Docker using a specialized DevOps image. | DevOps | `docker` |
+| `infracost.sh` / `.ps1` | Runs `infracost` via Docker to estimate cloud costs. Requires `.env` config. | DevOps | `docker` |
+| `terraform.sh` / `.ps1` | Runs `terraform` commands using a specialized DevOps Docker image. | DevOps | `docker` |
+| `n8n.sh` / `.ps1` | Runs `n8n-cli` via Docker to manage workflows. Requires `.env` configuration. | Automation | `docker` |
 
 ## Prerequisites
 
-- **Python 3 & rich**: Required for `gitctl` CLI tool.
-- **GitHub CLI (`gh`)**: Required for remote GitHub features in `gitctl`.
-- **Docker**: Required for DevOps and Automation containerized wrapper scripts.
+* **Python 3 & rich**: Required for `gitctl` and `nodetop` CLI tools.
+* **GitHub CLI (`gh`)**: Required for remote GitHub features in `gitctl`.
+* **Docker**: Required for DevOps and Automation containerized wrapper scripts (Docker Desktop on Windows or Rancher/WSL2).
 
 ## Installation
 
-Use the provided `install-script.sh` to install any script or CLI tool as a symlink in `~/.local/bin`:
+### Linux & macOS (Bash)
+
+Use `install-script.sh` to install any script or CLI tool as a symlink in `~/.local/bin`:
 
 ```bash
 # List available tools and scripts
@@ -95,3 +99,47 @@ Ensure `~/.local/bin` is in your `PATH`:
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
+
+### Windows 11 (PowerShell)
+
+Use `install-script.ps1` in PowerShell to install tools and CLI wrappers into `~/.local/bin` (or custom directory) with executable `.ps1` and `.cmd` shims:
+
+```powershell
+# List available tools and scripts
+.\install-script.ps1
+
+# Install a specific tool (e.g. gitctl, nodetop, terraform)
+.\install-script.ps1 gitctl
+.\install-script.ps1 terraform
+
+# Install all tools at once
+.\install-script.ps1 -All
+
+# Automatically ensure ~/.local/bin is in your User PATH
+.\install-script.ps1 -AddToPath
+```
+
+Once installed, simply type the command name directly in any PowerShell or Terminal window:
+
+```powershell
+# Run the unified Git audit tool
+gitctl status
+
+# Run AI-powered commit generator
+gitctl commit
+
+# Run node_exporter monitor
+nodetop ukitake
+
+# Run containerized DevOps tools directly
+terraform plan
+aws s3 ls
+az account show
+```
+
+#### Running Bash Scripts Directly on Windows
+
+If you prefer using the Bash scripts (`bash/*.sh`) on Windows 11:
+
+* **PowerShell**: Execute with Git Bash: `bash ./bash/terraform.sh` or with WSL: `wsl ./bash/terraform.sh`.
+* **Git Bash**: Run directly: `./bash/terraform.sh`. The scripts automatically configure `MSYS_NO_PATHCONV=1` and normalize Windows paths (`cygpath`) to ensure Docker volume mounts work without path corruption.

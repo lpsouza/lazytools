@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Prevent MSYS/Git Bash on Windows from auto-converting volume paths
+export MSYS_NO_PATHCONV=1
+
 # Colors for messaging
 NC="\033[0m"
 RED="\033[0;31m"

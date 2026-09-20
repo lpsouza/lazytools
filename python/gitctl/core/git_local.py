@@ -108,6 +108,8 @@ class GitScanner:
                 ["git", "-C", str(path), "rev-parse", "--is-inside-work-tree"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
             )
             return res.returncode == 0 and res.stdout.strip() == "true"
@@ -154,6 +156,8 @@ class GitScanner:
                 ["git", "-C", str(repo_path), "fetch", "--prune", "--quiet"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
@@ -212,6 +216,8 @@ class GitScanner:
                 ["git", "-C", str(repo_path), "status", "--porcelain=v2", "--branch"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
@@ -226,6 +232,8 @@ class GitScanner:
                                 ["git", "-C", str(repo_path), "describe", "--tags", "--always"],
                                 capture_output=True,
                                 text=True,
+                                encoding="utf-8",
+                                errors="replace",
                                 check=False,
                             )
                             branch = head_res.stdout.strip() or "(detached)"
@@ -272,6 +280,8 @@ class GitScanner:
                 ["git", "-C", str(repo_path), "rev-list", "--walk-reflogs", "--count", "refs/stash"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
             )
             if stash_res.returncode == 0 and stash_res.stdout.strip().isdigit():
@@ -288,6 +298,8 @@ class GitScanner:
                 ["git", "-C", str(repo_path), "remote"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
             )
             remotes = [r for r in remote_res.stdout.strip().splitlines() if r]
@@ -298,6 +310,8 @@ class GitScanner:
                     ["git", "-C", str(repo_path), "remote", "get-url", remote_name],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     check=False,
                 )
                 if url_res.returncode == 0:

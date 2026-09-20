@@ -6,12 +6,16 @@ from __future__ import annotations
 
 import argparse
 import os
-import readline
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+try:
+    import readline
+except ImportError:
+    readline = None
 
 from gitctl.core.ai_provider import generate_commit_message, get_available_providers
 from gitctl.core.console import (
@@ -42,6 +46,8 @@ def _run_git(args: List[str], cwd: Optional[Path] = None, check: bool = True) ->
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=check,
     )
 
@@ -79,23 +85,32 @@ def get_unstaged_count(cwd: Optional[Path] = None) -> int:
 
 
 def prompt_inline_edit(initial_text: str) -> str:
-    """Prompt user to edit message with readline prefill in terminal."""
-    def prefill_hook():
-        readline.insert_text(initial_text)
-        readline.redisplay()
+    """Prompt user to edit message with readline prefill or rich Prompt fallback."""
+    if readline is not None:
+        def prefill_hook():
+            readline.insert_text(initial_text)
+            readline.redisplay()
 
-    readline.set_pre_input_hook(prefill_hook)
-    try:
-        new_text = input("Edit commit message: ").strip()
-    finally:
-        readline.set_pre_input_hook()
+        readline.set_pre_input_hook(prefill_hook)
+        try:
+            new_text = input("Edit commit message: ").strip()
+        finally:
+            readline.set_pre_input_hook()
+        return new_text or initial_text
+
+    # Fallback for environments without readline (e.g. Windows)
+    if HAS_RICH:
+        new_text = Prompt.ask("Edit commit message", default=initial_text).strip()
+    else:
+        new_text = input(f"Edit commit message [{initial_text}]: ").strip()
 
     return new_text or initial_text
 
 
 def prompt_editor_edit(initial_text: str) -> str:
     """Open user's configured editor ($EDITOR or git editor) to edit message."""
-    editor = os.environ.get("GIT_EDITOR") or os.environ.get("EDITOR") or "nano"
+    default_editor = "notepad" if sys.platform == "win32" else "nano"
+    editor = os.environ.get("GIT_EDITOR") or os.environ.get("EDITOR") or default_editor
     with tempfile.NamedTemporaryFile(suffix=".txt", mode="w+", delete=False) as tf:
         tf.write(initial_text)
         tf_path = tf.name

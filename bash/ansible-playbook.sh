@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Prevent MSYS/Git Bash on Windows from auto-converting volume paths
+export MSYS_NO_PATHCONV=1
+
 # Colors for messaging
 NC="\033[0m"
 RED="\033[0;31m"
@@ -36,14 +39,22 @@ load_env() {
     fi
 }
 
+# Resolve paths safely for POSIX and Git Bash on Windows
+TARGET_PWD="$PWD"
+TARGET_HOME="$HOME"
+if command -v cygpath >/dev/null 2>&1; then
+    TARGET_PWD="$(cygpath -m "$PWD")"
+    TARGET_HOME="$(cygpath -m "$HOME")"
+fi
+
 # Initialize script
 check_dependencies
 load_env
 
 # Execute Ansible Playbook
 docker run --rm $FLAGS \
-  -v "${PWD}:/ansible" \
-  -v "${HOME}/.ssh:/root/.ssh" \
+  -v "${TARGET_PWD}:/ansible" \
+  -v "${TARGET_HOME}/.ssh:/root/.ssh" \
   -w /ansible \
   lpsouza/devops-tools \
   ansible-playbook "$@"

@@ -5,13 +5,19 @@ Interactive TUI dashboard engine for nodetop using rich.live.Live.
 from collections import deque
 import os
 import queue
-import select
 import sys
-import termios
 import threading
 import time
-import tty
 from typing import Dict, List, Optional
+
+if sys.platform != "win32":
+    import select
+    import termios
+    import tty
+else:
+    select = None  # type: ignore
+    termios = None  # type: ignore
+    tty = None  # type: ignore
 
 from rich.align import Align
 from rich.box import DOUBLE, ROUNDED
@@ -111,6 +117,23 @@ class NodetopApp:
             return
 
         def listener_loop():
+            if sys.platform == "win32":
+                try:
+                    import msvcrt
+                    while self.running:
+                        if msvcrt.kbhit():
+                            char = msvcrt.getwch()
+                            # Handle arrow / function keys prefix
+                            if char in ("\x00", "\xe0"):
+                                msvcrt.getwch()
+                            elif char:
+                                self._key_queue.put(char)
+                        else:
+                            time.sleep(0.05)
+                except Exception:
+                    pass
+                return
+
             try:
                 self._orig_termios = termios.tcgetattr(sys.stdin)
                 tty.setcbreak(sys.stdin.fileno())
@@ -134,7 +157,7 @@ class NodetopApp:
 
     def _restore_terminal(self) -> None:
         """Restores original terminal settings."""
-        if self._orig_termios and sys.stdin.isatty():
+        if sys.platform != "win32" and self._orig_termios and sys.stdin.isatty():
             try:
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._orig_termios)
             except Exception:

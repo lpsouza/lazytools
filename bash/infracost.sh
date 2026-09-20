@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Prevent MSYS/Git Bash on Windows from auto-converting volume paths
+export MSYS_NO_PATHCONV=1
+
 # Colors for messaging
 NC="\033[0m"
 RED="\033[0;31m"
@@ -36,13 +39,19 @@ load_env() {
     fi
 }
 
+# Resolve paths safely for POSIX and Git Bash on Windows
+TARGET_PWD="$PWD"
+if command -v cygpath >/dev/null 2>&1; then
+    TARGET_PWD="$(cygpath -m "$PWD")"
+fi
+
 # Initialize script
 check_dependencies
 load_env
 
 # Execute Infracost
 docker run --rm $FLAGS \
-  -v "${PWD}:/infracost" \
+  -v "${TARGET_PWD}:/infracost" \
   -w /infracost \
   -e INFRACOST_API_KEY="$INFRACOST_API_KEY" \
   infracost/infracost "$@"

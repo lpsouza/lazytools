@@ -47,11 +47,15 @@ if ([System.Environment]::UserInteractive -and -not [Console]::IsInputRedirected
 $workDir = (Get-Location).Path -replace '\\', '/'
 $homeDir = $HOME -replace '\\', '/'
 
+$gcloudDir = Join-Path $HOME ".config\gcloud"
+if (-not (Test-Path $gcloudDir)) {
+    New-Item -ItemType Directory -Path $gcloudDir -Force | Out-Null
+}
+
 & docker run --rm @dockerFlags `
     -v "${workDir}:/gcloud" `
-    -v "${homeDir}:/home/ubuntu" `
+    -v "${homeDir}/.config/gcloud:/home/ubuntu/.config/gcloud" `
     -w /gcloud `
-    -u ubuntu `
     lpsouza/devops-tools `
     gcloud @ScriptArgs
 

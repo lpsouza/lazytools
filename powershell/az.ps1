@@ -47,11 +47,15 @@ if ([System.Environment]::UserInteractive -and -not [Console]::IsInputRedirected
 $workDir = (Get-Location).Path -replace '\\', '/'
 $homeDir = $HOME -replace '\\', '/'
 
+$azureDir = Join-Path $HOME ".azure"
+if (-not (Test-Path $azureDir)) {
+    New-Item -ItemType Directory -Path $azureDir -Force | Out-Null
+}
+
 & docker run --rm @dockerFlags `
     -v "${workDir}:/az" `
-    -v "${homeDir}:/home/ubuntu" `
+    -v "${homeDir}/.azure:/home/ubuntu/.azure" `
     -w /az `
-    -u ubuntu `
     lpsouza/devops-tools `
     az @ScriptArgs
 

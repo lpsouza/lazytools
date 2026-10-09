@@ -55,9 +55,29 @@ $awsKey = if ($env:AWS_ACCESS_KEY_ID) { $env:AWS_ACCESS_KEY_ID } else { "" }
 $awsSecret = if ($env:AWS_SECRET_ACCESS_KEY) { $env:AWS_SECRET_ACCESS_KEY } else { "" }
 $awsToken = if ($env:AWS_SESSION_TOKEN) { $env:AWS_SESSION_TOKEN } else { "" }
 
+$awsDir = Join-Path $HOME ".aws"
+if (-not (Test-Path $awsDir)) {
+    New-Item -ItemType Directory -Path $awsDir -Force | Out-Null
+}
+
+$kubeDir = Join-Path $HOME ".kube"
+if (-not (Test-Path $kubeDir)) {
+    New-Item -ItemType Directory -Path $kubeDir -Force | Out-Null
+}
+
+$extraMounts = @(
+    "-v", "${homeDir}/.aws:/home/ubuntu/.aws",
+    "-v", "${homeDir}/.kube:/home/ubuntu/.kube"
+)
+
+$sshDir = Join-Path $HOME ".ssh"
+if (Test-Path $sshDir) {
+    $extraMounts += @("-v", "${homeDir}/.ssh:/home/ubuntu/.ssh")
+}
+
 & docker run --rm @dockerFlags `
     -v "${workDir}:/eksctl" `
-    -v "${homeDir}:/home/ubuntu" `
+    @extraMounts `
     -e HOME="/home/ubuntu" `
     -e "AWS_PROFILE=$awsProfile" `
     -e "AWS_REGION=$awsRegion" `
@@ -68,7 +88,6 @@ $awsToken = if ($env:AWS_SESSION_TOKEN) { $env:AWS_SESSION_TOKEN } else { "" }
     -e "AWS_SECRET_ACCESS_KEY=$awsSecret" `
     -e "AWS_SESSION_TOKEN=$awsToken" `
     -w /eksctl `
-    -u ubuntu `
     lpsouza/devops-tools `
     eksctl @ScriptArgs
 

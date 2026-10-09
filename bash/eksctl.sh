@@ -51,10 +51,27 @@ fi
 check_dependencies
 load_env
 
+# Setup extra mounts for eksctl
+EXTRA_DOCKER_ARGS=()
+
+# Ensure ~/.aws and ~/.kube directories exist
+[ -d "${HOME}/.aws" ] || mkdir -p "${HOME}/.aws"
+[ -d "${HOME}/.kube" ] || mkdir -p "${HOME}/.kube"
+
+EXTRA_DOCKER_ARGS+=(
+  -v "${TARGET_HOME}/.aws:/home/ubuntu/.aws"
+  -v "${TARGET_HOME}/.kube:/home/ubuntu/.kube"
+)
+
+# Mount ~/.ssh if present (for cluster keypair management)
+if [ -d "${HOME}/.ssh" ]; then
+    EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.ssh:/home/ubuntu/.ssh")
+fi
+
 # Execute eksctl
 docker run --rm $FLAGS \
   -v "${TARGET_PWD}:/eksctl" \
-  -v "${TARGET_HOME}:/home/ubuntu" \
+  "${EXTRA_DOCKER_ARGS[@]}" \
   -e HOME="/home/ubuntu" \
   -e AWS_PROFILE="${AWS_PROFILE:-default}" \
   -e AWS_REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}" \
@@ -65,6 +82,5 @@ docker run --rm $FLAGS \
   -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}" \
   -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN:-}" \
   -w /eksctl \
-  -u ubuntu \
   lpsouza/devops-tools \
   eksctl "$@"

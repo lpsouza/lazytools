@@ -51,12 +51,14 @@ fi
 check_dependencies
 load_env
 
+# Ensure ~/.aws directory exists
+[ -d "${HOME}/.aws" ] || mkdir -p "${HOME}/.aws"
+
 # Execute AWS CLI
 docker run --rm $FLAGS \
   -v "${TARGET_PWD}:/aws" \
-  -v "${TARGET_HOME}:/home/ubuntu" \
+  -v "${TARGET_HOME}/.aws:/home/ubuntu/.aws" \
   -e AWS_PROFILE="${AWS_PROFILE:-default}" \
   -w /aws \
-  -u ubuntu \
   lpsouza/devops-tools \
   aws "$@"

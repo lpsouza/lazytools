@@ -51,10 +51,44 @@ fi
 check_dependencies
 load_env
 
+# Setup extra mounts for SSH agent
+EXTRA_DOCKER_ARGS=()
+
+# Detect 1Password or generic SSH agent socket
+SSH_SOCK=""
+if [ -S "${HOME}/.1password/agent.sock" ]; then
+    SSH_SOCK="${HOME}/.1password/agent.sock"
+elif [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+    SSH_SOCK="$SSH_AUTH_SOCK"
+fi
+
+if [ -n "$SSH_SOCK" ]; then
+    TARGET_SSH_SOCK="$SSH_SOCK"
+    if command -v cygpath >/dev/null 2>&1; then
+        TARGET_SSH_SOCK="$(cygpath -m "$SSH_SOCK")"
+    fi
+    EXTRA_DOCKER_ARGS+=(
+        -v "${TARGET_SSH_SOCK}:/home/ubuntu/.1password/agent.sock"
+        -e "SSH_AUTH_SOCK=/home/ubuntu/.1password/agent.sock"
+    )
+fi
+
+# Resolve symlinked ~/.ssh/config to prevent broken symlinks inside container
+if [ -L "${HOME}/.ssh/config" ] && [ -f "${HOME}/.ssh/config" ]; then
+    RESOLVED_CONFIG="$(readlink -f "${HOME}/.ssh/config")"
+    if command -v cygpath >/dev/null 2>&1; then
+        RESOLVED_CONFIG="$(cygpath -m "$RESOLVED_CONFIG")"
+    fi
+    EXTRA_DOCKER_ARGS+=(-v "${RESOLVED_CONFIG}:/home/ubuntu/.ssh/config")
+fi
+
 # Execute Ansible Playbook
 docker run --rm $FLAGS \
   -v "${TARGET_PWD}:/ansible" \
-  -v "${TARGET_HOME}/.ssh:/root/.ssh" \
+  -v "${TARGET_HOME}/.ssh:/home/ubuntu/.ssh" \
+  "${EXTRA_DOCKER_ARGS[@]}" \
   -w /ansible \
   lpsouza/devops-tools \
   ansible-playbook "$@"
+
+

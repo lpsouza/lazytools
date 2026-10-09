@@ -48,12 +48,16 @@ $workDir = (Get-Location).Path -replace '\\', '/'
 $homeDir = $HOME -replace '\\', '/'
 $awsProfile = if ($env:AWS_PROFILE) { $env:AWS_PROFILE } else { "default" }
 
+$awsDir = Join-Path $HOME ".aws"
+if (-not (Test-Path $awsDir)) {
+    New-Item -ItemType Directory -Path $awsDir -Force | Out-Null
+}
+
 & docker run --rm @dockerFlags `
     -v "${workDir}:/aws" `
-    -v "${homeDir}:/home/ubuntu" `
+    -v "${homeDir}/.aws:/home/ubuntu/.aws" `
     -e "AWS_PROFILE=$awsProfile" `
     -w /aws `
-    -u ubuntu `
     lpsouza/devops-tools `
     aws @ScriptArgs
 

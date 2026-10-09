@@ -51,11 +51,13 @@ fi
 check_dependencies
 load_env
 
+# Ensure ~/.azure directory exists
+[ -d "${HOME}/.azure" ] || mkdir -p "${HOME}/.azure"
+
 # Execute Azure CLI
 docker run --rm $FLAGS \
   -v "${TARGET_PWD}:/az" \
-  -v "${TARGET_HOME}:/home/ubuntu" \
+  -v "${TARGET_HOME}/.azure:/home/ubuntu/.azure" \
   -w /az \
-  -u ubuntu \
   lpsouza/devops-tools \
   az "$@"

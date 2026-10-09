@@ -49,7 +49,7 @@ $homeDir = $HOME -replace '\\', '/'
 
 & docker run --rm @dockerFlags `
     -v "${workDir}:/ansible" `
-    -v "${homeDir}/.ssh:/root/.ssh" `
+    -v "${homeDir}/.ssh:/home/ubuntu/.ssh" `
     -w /ansible `
     lpsouza/devops-tools `
     ansible-playbook @ScriptArgs

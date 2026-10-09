@@ -51,11 +51,13 @@ fi
 check_dependencies
 load_env
 
+# Ensure ~/.config/gcloud directory exists
+[ -d "${HOME}/.config/gcloud" ] || mkdir -p "${HOME}/.config/gcloud"
+
 # Execute gcloud CLI
 docker run --rm $FLAGS \
   -v "${TARGET_PWD}:/gcloud" \
-  -v "${TARGET_HOME}:/home/ubuntu" \
+  -v "${TARGET_HOME}/.config/gcloud:/home/ubuntu/.config/gcloud" \
   -w /gcloud \
-  -u ubuntu \
   lpsouza/devops-tools \
   gcloud "$@"

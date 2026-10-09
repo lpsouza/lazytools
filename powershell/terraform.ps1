@@ -47,11 +47,51 @@ if ([System.Environment]::UserInteractive -and -not [Console]::IsInputRedirected
 $workDir = (Get-Location).Path -replace '\\', '/'
 $homeDir = $HOME -replace '\\', '/'
 
+$extraMounts = @()
+
+# SSH and 1Password agent socket
+$opSock = Join-Path $HOME ".1password\agent.sock"
+if (Test-Path $opSock) {
+    $extraMounts += @("-v", "${homeDir}/.1password/agent.sock:/home/ubuntu/.1password/agent.sock", "-e", "SSH_AUTH_SOCK=/home/ubuntu/.1password/agent.sock")
+} elseif ($env:SSH_AUTH_SOCK -and (Test-Path $env:SSH_AUTH_SOCK)) {
+    $sockPath = $env:SSH_AUTH_SOCK -replace '\\', '/'
+    $extraMounts += @("-v", "${sockPath}:/home/ubuntu/.1password/agent.sock", "-e", "SSH_AUTH_SOCK=/home/ubuntu/.1password/agent.sock")
+}
+
+$sshDir = Join-Path $HOME ".ssh"
+if (Test-Path $sshDir) {
+    $extraMounts += @("-v", "${homeDir}/.ssh:/home/ubuntu/.ssh")
+}
+
+$tfDir = Join-Path $HOME ".terraform.d"
+if (Test-Path $tfDir) {
+    $extraMounts += @("-v", "${homeDir}/.terraform.d:/home/ubuntu/.terraform.d")
+}
+
+$awsDir = Join-Path $HOME ".aws"
+if (Test-Path $awsDir) {
+    $extraMounts += @("-v", "${homeDir}/.aws:/home/ubuntu/.aws")
+}
+
+$azureDir = Join-Path $HOME ".azure"
+if (Test-Path $azureDir) {
+    $extraMounts += @("-v", "${homeDir}/.azure:/home/ubuntu/.azure")
+}
+
+$gcloudDir = Join-Path $HOME ".config\gcloud"
+if (Test-Path $gcloudDir) {
+    $extraMounts += @("-v", "${homeDir}/.config/gcloud:/home/ubuntu/.config/gcloud")
+}
+
+$kubeDir = Join-Path $HOME ".kube"
+if (Test-Path $kubeDir) {
+    $extraMounts += @("-v", "${homeDir}/.kube:/home/ubuntu/.kube")
+}
+
 & docker run --rm @dockerFlags `
     -v "${workDir}:/terraform" `
-    -v "${homeDir}:/home/ubuntu" `
+    @extraMounts `
     -w /terraform `
-    -u ubuntu `
     lpsouza/devops-tools `
     terraform @ScriptArgs
 

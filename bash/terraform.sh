@@ -51,11 +51,51 @@ fi
 check_dependencies
 load_env
 
+# Setup extra mounts for SSH agent, credentials, and configs
+EXTRA_DOCKER_ARGS=()
+
+# Detect 1Password or generic SSH agent socket
+SSH_SOCK=""
+if [ -S "${HOME}/.1password/agent.sock" ]; then
+    SSH_SOCK="${HOME}/.1password/agent.sock"
+elif [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+    SSH_SOCK="$SSH_AUTH_SOCK"
+fi
+
+if [ -n "$SSH_SOCK" ]; then
+    TARGET_SSH_SOCK="$SSH_SOCK"
+    if command -v cygpath >/dev/null 2>&1; then
+        TARGET_SSH_SOCK="$(cygpath -m "$SSH_SOCK")"
+    fi
+    EXTRA_DOCKER_ARGS+=(
+        -v "${TARGET_SSH_SOCK}:/home/ubuntu/.1password/agent.sock"
+        -e "SSH_AUTH_SOCK=/home/ubuntu/.1password/agent.sock"
+    )
+fi
+
+# Mount ~/.ssh if present and resolve symlinked config
+if [ -d "${HOME}/.ssh" ]; then
+    EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.ssh:/home/ubuntu/.ssh")
+    if [ -L "${HOME}/.ssh/config" ] && [ -f "${HOME}/.ssh/config" ]; then
+        RESOLVED_CONFIG="$(readlink -f "${HOME}/.ssh/config")"
+        if command -v cygpath >/dev/null 2>&1; then
+            RESOLVED_CONFIG="$(cygpath -m "$RESOLVED_CONFIG")"
+        fi
+        EXTRA_DOCKER_ARGS+=(-v "${RESOLVED_CONFIG}:/home/ubuntu/.ssh/config")
+    fi
+fi
+
+# Conditionally mount cloud credentials and Terraform configs
+[ -d "${HOME}/.terraform.d" ] && EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.terraform.d:/home/ubuntu/.terraform.d")
+[ -d "${HOME}/.aws" ] && EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.aws:/home/ubuntu/.aws")
+[ -d "${HOME}/.azure" ] && EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.azure:/home/ubuntu/.azure")
+[ -d "${HOME}/.config/gcloud" ] && EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.config/gcloud:/home/ubuntu/.config/gcloud")
+[ -d "${HOME}/.kube" ] && EXTRA_DOCKER_ARGS+=(-v "${TARGET_HOME}/.kube:/home/ubuntu/.kube")
+
 # Execute Terraform
 docker run --rm $FLAGS \
   -v "${TARGET_PWD}:/terraform" \
-  -v "${TARGET_HOME}:/home/ubuntu" \
+  "${EXTRA_DOCKER_ARGS[@]}" \
   -w /terraform \
-  -u ubuntu \
   lpsouza/devops-tools \
   terraform "$@"
